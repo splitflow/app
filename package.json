@@ -1,0 +1,46 @@
+{
+    "name": "@splitflow/app",
+    "version": "1.0.0",
+    "description": "Splitflow app package",
+    "author": "team@splitflow.io",
+    "homepage": "https://github.com/splitflow/app#readme",
+    "bugs": {
+        "url": "https://github.com/splitflow/app/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/splitflow/app.git"
+    },
+    "type": "module",
+    "files": [
+        "dist/**/*.js",
+        "dist/**/*.cjs",
+        "dist/**/*.d.ts"
+    ],
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs"
+        }
+    },
+    "typesVersions": {
+        "*": {
+            "*": [
+                "dist/index.d.ts"
+            ]
+        }
+    },
+    "scripts": {
+        "build": "tsup",
+        "build:watch": "tsup --watch",
+        "test": "vitest"
+    },
+    "devDependencies": {
+        "tsup": "^6.5.0",
+        "typescript": "^4.9.4",
+        "vitest": "^0.27.3"
+    },
+    "dependencies": {
+        "@splitflow/core": "^2.0.0"
+    }
+}
