@@ -41,6 +41,6 @@
         "vitest": "^0.27.3"
     },
     "dependencies": {
-        "@splitflow/core": "^1.3.3"
+        "@splitflow/core": "^2.0.0"
     }
 }

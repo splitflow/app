@@ -1,8 +1,8 @@
 import { derived, type Readable } from '@splitflow/core/stores'
-import { merge } from '@splitflow/core/utils/object'
+import { merge } from '@splitflow/core/utils'
 
 export interface Resource {
-    type: string
+    name: string
 }
 
 export interface FetchOptions {
@@ -10,22 +10,22 @@ export interface FetchOptions {
 }
 
 export interface Datasource {
-    addResourceHandler: (type: string, handler: (resource: Resource) => Readable<unknown>) => void
+    addResourceHandler: (name: string, handler: (resource: Resource) => Readable<unknown>) => void
     removeResourceHandler: (
-        type: string,
+        name: string,
         handler: (resource: Resource) => Readable<unknown>
     ) => void
-    fetchResource: (resource: Resource, options?: FetchOptions) => Readable<unknown>
+    fetchResource: <T>(resource: Resource, options?: FetchOptions) => Readable<T>
 }
 
 export function createDatasource(): Datasource {
     const registry = new Map<string, Array<(resource: Resource) => Readable<unknown>>>()
 
-    function addResourceHandler(type: string, handler: (resource: Resource) => Readable<unknown>) {
-        let handlers = registry.get(type)
+    function addResourceHandler(name: string, handler: (resource: Resource) => Readable<unknown>) {
+        let handlers = registry.get(name)
         if (!handlers) {
             handlers = new Array<(resource: Resource) => Readable<unknown>>()
-            registry.set(type, handlers)
+            registry.set(name, handlers)
         }
         if (handlers.indexOf(handler) < 0) {
             handlers.unshift(handler)
@@ -33,23 +33,23 @@ export function createDatasource(): Datasource {
     }
 
     function removeResourceHandler(
-        type: string,
+        name: string,
         handler: (resource: Resource) => Readable<unknown>
     ) {
-        let handlers = registry.get(type)
+        let handlers = registry.get(name)
         if (handlers) {
             const index = handlers.indexOf(handler)
             handlers.splice(index, 1)
         }
     }
 
-    function fetchResource(resource: Resource, options?: FetchOptions): Readable<unknown> {
-        let handlers = registry.get(resource.type)
+    function fetchResource<T>(resource: Resource, options?: FetchOptions): Readable<T> {
+        let handlers = registry.get(resource.name)
         if (handlers) {
-            const readables: Readable<unknown>[] = []
+            const readables: Readable<T>[] = []
 
             for (const handler of handlers) {
-                const readable = handler(resource)
+                const readable = handler(resource) as Readable<T>
                 if (readable && options?.multiFetch) {
                     readables.push(readable)
                     continue
@@ -63,7 +63,7 @@ export function createDatasource(): Datasource {
                 return mergeReadables(readables)
             }
         } else {
-            console.warn(`no handler defined for resource "${resource.type}"`)
+            console.warn(`no handler defined for resource "${resource.name}"`)
         }
 
         return undefined
@@ -76,10 +76,10 @@ export function createDatasource(): Datasource {
     }
 }
 
-function mergeReadables(readables: Readable<unknown>[]) {
+function mergeReadables<T>(readables: Readable<T>[]) {
     if (readables.length === 1) return readables[0]
 
     return derived(readables, (values) => {
-        return values.reduce(merge, {})
+        return values.reduce(merge)
     })
 }

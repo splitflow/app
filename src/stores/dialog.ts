@@ -26,6 +26,7 @@ export function open(
             dialog.update((d) => ({ ...d, [dialogName]: null }))
         },
         cancel: () => {
+            close?.(undefined)
             dialog.update((d) => ({ ...d, [dialogName]: null }))
         }
     }

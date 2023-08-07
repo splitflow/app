@@ -1,9 +1,9 @@
 import { Datasource, createDatasource } from './datasource'
 import { Dispatcher, createDisatcher } from './dispatch'
 import * as actions from './actions'
-import panel from './stores/panel'
-import dialog from './stores/dialog'
-import alert from './stores/alert'
+import panel, { PanelState } from './stores/panel'
+import dialog, { DialogState } from './stores/dialog'
+import alert, { AlertState } from './stores/alert'
 
 export interface AppConfig {
     projectId?: string
@@ -13,12 +13,12 @@ export class SplitflowApp {
     constructor(dispatcher: Dispatcher, datasource: Datasource, config?: AppConfig) {
         this.dispatcher = dispatcher
         this.datasource = datasource
-        this.config = config
+        this.#config = config
     }
 
     dispatcher: Dispatcher
     datasource: Datasource
-    config: AppConfig
+    #config: AppConfig
 
     display(panelName: string, discardPanels?: string[]) {
         const action: actions.PanelAction = { type: 'display', name: panelName, discardPanels }
@@ -30,16 +30,20 @@ export class SplitflowApp {
         this.dispatcher.dispatchAction(action)
     }
 
+    get config() {
+        return this.#config
+    }
+
     get panel() {
-        return panel
+        return this.datasource.fetchResource<PanelState>({name: 'panel'})
     }
 
     get dialog() {
-        return dialog
+        return this.datasource.fetchResource<DialogState>({name: 'dialog'})
     }
 
     get alert() {
-        return alert
+        return this.datasource.fetchResource<AlertState>({name: 'alert'})
     }
 }
 
@@ -83,6 +87,9 @@ export function createSplitflowApp(
     dispatcher.addActionHandler('show', actions.show)
 
     const datasource = createDatasource()
+    datasource.addResourceHandler('panel', () => panel)
+    datasource.addResourceHandler('dialog', () => dialog)
+    datasource.addResourceHandler('alert', () => alert)
 
     return new App(dispatcher, datasource, config)
 }

@@ -12,13 +12,13 @@ export interface AlertData {
 
 const alert = writable<AlertState>({})
 
-let closeTimer: NodeJS.Timeout
+let dismissTimer: NodeJS.Timeout
 
 export function show(
     alertName: string,
     value: string,
     error: boolean,
-    delay = 1000,
+    delay = 5000,
     dismiss: () => void,
     data: object
 ) {
@@ -34,9 +34,12 @@ export function show(
 
     alert.set({ [alertName]: alertData })
 
-    clearTimeout(closeTimer)
+    clearTimeout(dismissTimer)
     if (delay) {
-        closeTimer = setTimeout(() => alert.set({}), delay)
+        dismissTimer = setTimeout(() => {
+            dismiss?.()
+            alert.set({})
+        }, delay)
     }
 }
 
