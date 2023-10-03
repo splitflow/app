@@ -7,9 +7,11 @@ import alert, { AlertState } from './stores/alert'
 import { SSRRegistry, SplitflowDesigner, createDesigner } from '@splitflow/designer'
 
 export interface AppConfig {
+    projectId?: string
     appId?: string
     devtool?: boolean
     ssr?: boolean
+    local?: boolean
 }
 
 export interface SplitflowApp {
