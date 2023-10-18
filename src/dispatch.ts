@@ -7,7 +7,17 @@ export interface Action {
     type: string
 }
 
-export interface Result {}
+export interface Result {
+}
+
+export interface ErrorResult {
+    error?: Error
+}
+
+export interface Error {
+    code: string
+    message: string
+}
 
 export interface DispatchOptions {
     multiDispatch?: boolean

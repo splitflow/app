@@ -1,5 +1,5 @@
 import { Datasource, createDatasource } from './datasource'
-import { Dispatcher, createDisatcher } from './dispatch'
+import { Dispatcher, Error, createDisatcher } from './dispatch'
 import * as actions from './actions'
 import panel, { PanelState } from './stores/panel'
 import dialog, { DialogState } from './stores/dialog'
@@ -114,11 +114,11 @@ export class SplitflowApp {
     datasource: Datasource
     designer: SplitflowDesigner
     #config: AppConfig
-    #initialize: Promise<void>
+    #initialize: Promise<{ error?: Error }>
 
     async initialize() {
         return (this.#initialize ??= (async () => {
-            await this.designer.initialize()
+            return this.designer.initialize()
         })())
     }
 
