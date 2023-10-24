@@ -12,6 +12,7 @@ export interface AppConfig {
     devtool?: boolean
     ssr?: boolean
     local?: boolean
+    remote?: boolean
 }
 
 export interface SplitflowApp {
