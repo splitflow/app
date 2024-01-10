@@ -5,6 +5,7 @@ import panel, { PanelState } from './stores/panel'
 import dialog, { DialogState } from './stores/dialog'
 import alert, { AlertState } from './stores/alert'
 import { SSRRegistry, SplitflowDesigner, createDesigner } from '@splitflow/designer'
+import { Gateway, createGateway } from './gateway'
 
 export interface AppConfig {
     projectId?: string
@@ -18,6 +19,7 @@ export interface AppConfig {
 export interface SplitflowApp {
     dispatcher: Dispatcher
     datasource: Datasource
+    gateway: Gateway
     designer: SplitflowDesigner
 }
 
@@ -27,6 +29,7 @@ export interface SplitflowAppConstructor<T extends SplitflowApp> {
     new (
         dispatcher: Dispatcher,
         datasource: Datasource,
+        gateway: Gateway,
         designer: SplitflowDesigner,
         config: AppConfig
     ): T
@@ -47,6 +50,7 @@ export function initializeSplitflowApp(
         defaultApp = new App(
             defaultApp.dispatcher,
             defaultApp.datasource,
+            defaultApp.gateway,
             defaultApp.designer,
             config
         )
@@ -80,8 +84,9 @@ export function createSplitflowApp(config: AppConfig, arg2?: any, arg3?: any) {
     const dispatcher = createDisatcher()
     const datasource = createDatasource()
     const designer = createDesigner(config, undefined, registry)
+    const gateway = createGateway()
 
-    return new App(dispatcher, datasource, designer, config)
+    return new App(dispatcher, datasource, gateway, designer, config)
 }
 
 export function getDefaultApp() {
@@ -92,11 +97,13 @@ export class SplitflowApp {
     constructor(
         dispatcher: Dispatcher,
         datasource: Datasource,
+        gateway: Gateway,
         designer: SplitflowDesigner,
         config?: AppConfig
     ) {
         this.dispatcher = dispatcher
         this.datasource = datasource
+        this.gateway = gateway
         this.designer = designer
         this.#config = config
 
@@ -113,6 +120,7 @@ export class SplitflowApp {
 
     dispatcher: Dispatcher
     datasource: Datasource
+    gateway: Gateway
     designer: SplitflowDesigner
     #config: AppConfig
     #initialize: Promise<{ error?: Error }>

@@ -42,6 +42,7 @@
     },
     "dependencies": {
         "@splitflow/core": "^2.1.0",
-        "@splitflow/designer": "^2.1.0"
+        "@splitflow/designer": "file:../designer",
+        "@splitflow/lib": "file:../lib"
     }
 }
