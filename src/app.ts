@@ -6,9 +6,15 @@ import dialog, { DialogState } from './stores/dialog'
 import alert, { AlertState } from './stores/alert'
 import { SSRRegistry, SplitflowDesigner, createDesigner } from '@splitflow/designer'
 import { Gateway, createGateway } from './gateway'
+import { Writable, writable } from '@splitflow/core/stores'
+
+function isWritable(object: any): object is Writable<any> {
+    if (!!object?.subscribe && !!object?.set) return true
+    return false
+}
 
 export interface AppConfig {
-    projectId?: string
+    accountId?: string
     appId?: string
     devtool?: boolean
     ssr?: boolean
@@ -125,7 +131,7 @@ export class SplitflowApp {
     #config: AppConfig
     #initialize: Promise<{ error?: Error }>
 
-    async initialize() {
+    async initialize(_?: any) {
         return (this.#initialize ??= (async () => {
             return this.designer.initialize()
         })())
@@ -138,6 +144,18 @@ export class SplitflowApp {
 
     discard(panelName: string) {
         const action: actions.PanelAction = { type: 'discard', name: panelName }
+        this.dispatcher.dispatchAction(action)
+    }
+
+    open<T>(dialogName: string, value?: T | Writable<T>, close?: (value: T) => void) {
+        value = isWritable(value) ? value : writable(value)
+        const action: actions.DialogAction = { type: 'open', name: dialogName, value, close }
+        this.dispatcher.dispatchAction(action)
+        return value
+    }
+
+    cancel(dialogName: string) {
+        const action: actions.DialogAction = { type: 'cancel', name: dialogName }
         this.dispatcher.dispatchAction(action)
     }
 

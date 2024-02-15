@@ -1,5 +1,5 @@
 interface Record {
-    handler: (action: Action, context: any) => Result
+    handler: (action: Action, context: any, next?: () => any) => any
     context: any
 }
 
@@ -7,8 +7,7 @@ export interface Action {
     type: string
 }
 
-export interface Result {
-}
+export interface Result {}
 
 export interface ErrorResult {
     error?: Error
@@ -25,29 +24,41 @@ export interface DispatchOptions {
 }
 
 export interface Dispatcher {
-    addActionHandler(type: string, handler: (action: Action) => Result): void
-    addActionHandler<T>(
+    addActionHandler<C, R extends Result>(
         type: string,
-        handler: (action: Action, context: T) => Result,
-        context: T
+        handler: (action: Action, context?: C, next?: () => R) => R,
+        context?: C
     ): void
-    removeActionHandler<T>(type: string, handler: (action: Action) => Result): void
-    removeActionHandler<T>(
+    addActionHandler<C, R extends Result>(
         type: string,
-        handler: (action: Action, context: T) => Result,
-        context: T
+        handler: (action: Action, context?: C, next?: () => Promise<R>) => Promise<R>,
+        context?: C
     ): void
-    dispatchAction(action: Action, options?: DispatchOptions): Result
+    removeActionHandler<C, R extends Result>(
+        type: string,
+        handler: (action: Action, context?: C, next?: () => R) => R,
+        context?: C
+    ): void
+    removeActionHandler<C, R extends Result>(
+        type: string,
+        handler: (action: Action, context?: C, next?: () => Promise<R>) => Promise<R>,
+        context?: C
+    ): void
+    dispatchAction<R extends Result>(action: Action, options?: DispatchOptions): R
+    dispatchAsyncAction<R extends Result>(action: Action, options?: DispatchOptions): Promise<R>
 }
 
 export function createDisatcher(): Dispatcher {
-    const registry = new Map<string, Array<Record>>()
+    const handlerRegistry = new Map<string, Array<Record>>()
+    const interceptorRegistry = new Map<string, Array<Record>>()
 
     function addActionHandler(
         type: string,
-        handler: (action: Action, context?: any) => Result,
+        handler: (action: Action, context?: any, next?: () => any) => any,
         context?: any
     ) {
+        const registry = handler.length === 3 ? interceptorRegistry : handlerRegistry
+
         let records = registry.get(type)
         if (!records) {
             records = new Array()
@@ -60,9 +71,11 @@ export function createDisatcher(): Dispatcher {
 
     function removeActionHandler(
         type: string,
-        handler: (action: Action, context?: any) => Result,
+        handler: (action: Action, context?: any, next?: () => any) => any,
         context?: any
     ) {
+        const registry = handler.length === 3 ? interceptorRegistry : handlerRegistry
+
         let records = registry.get(type)
         if (records) {
             const index = records.findIndex((r) => r.handler === handler && r.context === context)
@@ -70,12 +83,14 @@ export function createDisatcher(): Dispatcher {
         }
     }
 
-    function dispatchAction(action: Action, options?: DispatchOptions): Result {
-        let records = registry.get(action.type)
+    function dispatchAction(action: Action, options?: DispatchOptions, async = false): any {
+        let records = handlerRegistry.get(action.type)
         if (records) {
             for (const record of records) {
                 if (record.context?.accept?.(options?.discriminator) ?? true) {
-                    const result = record.handler(action, record.context)
+                    const result = intercept(action, options, async, () =>
+                        assert(record.handler(action, record.context), action, async)
+                    )
                     if (result && !options?.multiDispatch) return result
                 }
             }
@@ -85,9 +100,45 @@ export function createDisatcher(): Dispatcher {
         return {}
     }
 
+    function dispatchAsyncAction(action: Action, options?: DispatchOptions): any {
+        return dispatchAction(action, options, true)
+    }
+
+    function intercept(action: Action, options: DispatchOptions, async: boolean, next: () => any) {
+        let records = interceptorRegistry.get(action.type)
+
+        if (records) {
+            let index = 0
+            const _next = () => {
+                const record = records[index++]
+                if (record && (record.context?.accept?.(options?.discriminator) ?? true)) {
+                    return assert(record.handler(action, record.context, _next), action, async)
+                }
+                return next()
+            }
+            return _next()
+        }
+        return next()
+    }
+
     return {
         addActionHandler,
         removeActionHandler,
-        dispatchAction
+        dispatchAction,
+        dispatchAsyncAction
     }
+}
+
+function assert(result: any, action: Action, async: boolean) {
+    if (!result) return result
+
+    if (async && typeof result.then !== 'function')
+        throw new Error(
+            `handler or interceptor for action "${action.type}" returned a Result. Use dispatchAction instead`
+        )
+    if (!async && typeof result.then === 'function')
+        throw new Error(
+            `handler or interceptor for action "${action.type}" returned a Promise. Use dispatchAsyncAction instead`
+        )
+    return result
 }

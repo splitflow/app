@@ -1,9 +1,10 @@
-import { actionRequestX, getResult } from '@splitflow/lib'
+import { ActionEndpoint, Result, actionRequestX, getResult } from '@splitflow/lib'
 import {
     type GetAccessTokenAction,
     GetAccessTokenEndpoint,
     GetAccessTokenResult
 } from '@splitflow/lib/auth'
+import { Action } from './dispatch'
 
 export interface Gateway {
     fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -20,7 +21,7 @@ export function createGateway(_fetch = fetch): Gateway {
             if (authorization === 'bearer TOKEN') {
                 if (!accessToken) {
                     const action: GetAccessTokenAction = { type: 'get-access-token' }
-                    const response = await fetch(actionRequestX(action, GetAccessTokenEndpoint))
+                    const response = await _fetch(actionRequestX(action, GetAccessTokenEndpoint))
                     const result = await getResult<GetAccessTokenResult>(response)
                     accessToken = result.accessToken
                 }
@@ -34,9 +35,36 @@ export function createGateway(_fetch = fetch): Gateway {
                 request = new Request(getDevURL(url), request)
             }
 
-            return _fetch(request, init)
+            const response = await _fetch(request, init)
+            if (response.headers.has('x-discard-authorization')) {
+                accessToken = undefined
+            }
+            return response
         }
     }
+}
+
+// handler instance must be the same when calling addActionHandler and removeActionHandler
+// so we cache it
+const bridgeRegistry = new Map<
+    ActionEndpoint<Action>,
+    (action: Action, context: { gateway: Gateway }) => Promise<Result>
+>()
+
+export function bridge<A extends Action, R extends Result>(endpoint: ActionEndpoint<A>) {
+    let handler = bridgeRegistry.get(endpoint) as (
+        action: A,
+        context: { gateway: Gateway }
+    ) => Promise<R>
+
+    if (!handler) {
+        handler = (action: A, context: { gateway: Gateway }) => {
+            const response = context.gateway.fetch(actionRequestX(action, endpoint))
+            return getResult<R>(response)
+        }
+        bridgeRegistry.set(endpoint, handler)
+    }
+    return handler
 }
 
 function getDevURL(url: URL) {

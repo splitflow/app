@@ -41,7 +41,7 @@
         "vitest": "^0.27.3"
     },
     "dependencies": {
-        "@splitflow/core": "^2.1.0",
+        "@splitflow/core": "file:../core",
         "@splitflow/designer": "file:../designer",
         "@splitflow/lib": "file:../lib"
     }
