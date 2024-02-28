@@ -15,6 +15,7 @@ export interface DialogAction {
     name: string
     value?: Writable<unknown>
     close?: (value: unknown) => void
+    target?: EventTarget
 }
 
 export interface AlertAction {

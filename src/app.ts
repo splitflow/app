@@ -4,7 +4,13 @@ import * as actions from './actions'
 import panel, { PanelState } from './stores/panel'
 import dialog, { DialogState } from './stores/dialog'
 import alert, { AlertState } from './stores/alert'
-import { SSRRegistry, SplitflowDesigner, createDesigner } from '@splitflow/designer'
+import {
+    SSRRegistry,
+    SplitflowDesigner,
+    SplitflowDesignerKit,
+    createDesigner,
+    createDesignerKit
+} from '@splitflow/designer'
 import { Gateway, createGateway } from './gateway'
 import { Writable, writable } from '@splitflow/core/stores'
 
@@ -174,6 +180,26 @@ export class SplitflowApp {
     get alert() {
         return this.datasource.fetchResource<AlertState>({ name: 'alert' })
     }
+}
+
+export function createSplitflowAppKit(
+    config: AppConfig,
+    fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+) {
+    const gateway = createGateway(fetch)
+    const designer = createDesignerKit(config)
+
+    return {
+        gateway,
+        designer,
+        config
+    }
+}
+
+export interface SplitflowAppKit {
+    gateway: Gateway
+    designer: SplitflowDesignerKit
+    config: AppConfig
 }
 
 function isSSRRegistry(value: any): value is SSRRegistry {
