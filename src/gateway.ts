@@ -10,7 +10,12 @@ export interface Gateway {
     fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 }
 
-export function createGateway(_fetch = fetch): Gateway {
+export interface GatewayOptions {
+    apiKey?: string
+    refreshToken?: string
+}
+
+export function createGateway(options: GatewayOptions = {}, _fetch = fetch): Gateway {
     let accessToken: string
 
     return {
@@ -19,14 +24,27 @@ export function createGateway(_fetch = fetch): Gateway {
             const authorization = request.headers.get('authorization')
 
             if (authorization === 'bearer TOKEN') {
-                if (!accessToken) {
-                    const action: GetAccessTokenAction = { type: 'get-access-token' }
-                    const response = await _fetch(actionRequestX(action, GetAccessTokenEndpoint))
-                    const result = await getResult<GetAccessTokenResult>(response)
-                    accessToken = result.accessToken
-                }
+                if (options?.apiKey) {
+                    // authenticate request using API key
+                    const { apiKey } = options
+                    request.headers.set('authorization', `bearer ${apiKey}`)
+                } else {
+                    // authenticate request using access token
+                    if (!accessToken) {
+                        const { refreshToken } = options
+                        const action: GetAccessTokenAction = {
+                            type: 'get-access-token',
+                            refreshToken
+                        }
+                        const response = await _fetch(
+                            actionRequestX(action, GetAccessTokenEndpoint)
+                        )
+                        const result = await getResult<GetAccessTokenResult>(response)
+                        accessToken = result.accessToken
+                    }
 
-                request.headers.set('authorization', `bearer ${accessToken}`)
+                    request.headers.set('authorization', `bearer ${accessToken}`)
+                }
             }
 
             if (false) {

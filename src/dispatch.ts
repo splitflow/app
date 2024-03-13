@@ -7,9 +7,7 @@ export interface Action {
     type: string
 }
 
-export interface Result {}
-
-export interface ErrorResult {
+export interface Result {
     error?: Error
 }
 

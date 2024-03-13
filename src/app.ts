@@ -5,11 +5,13 @@ import panel, { PanelState } from './stores/panel'
 import dialog, { DialogState } from './stores/dialog'
 import alert, { AlertState } from './stores/alert'
 import {
+    DesignerBundle,
     SSRRegistry,
     SplitflowDesigner,
     SplitflowDesignerKit,
     createDesigner,
-    createDesignerKit
+    createDesignerKit,
+    loadSplitflowDesignerBundle
 } from '@splitflow/designer'
 import { Gateway, createGateway } from './gateway'
 import { Writable, writable } from '@splitflow/core/stores'
@@ -85,7 +87,10 @@ export function createSplitflowApp<T extends SplitflowApp>(
     App: SplitflowAppConstructor<T>
 ): T
 
-export function createSplitflowApp(config: AppConfig, arg2?: any, arg3?: any) {
+export function createSplitflowApp(init: AppConfig | AppBundle, arg2?: any, arg3?: any) {
+    const bundle = isAppBundle(init) ? init : undefined
+    const config = isAppBundle(init) ? init.config : init
+
     const registry = isSSRRegistry(arg2) ? arg2 : undefined
     const App = isSplitflowAppConstructor(arg2)
         ? arg2
@@ -95,7 +100,7 @@ export function createSplitflowApp(config: AppConfig, arg2?: any, arg3?: any) {
 
     const dispatcher = createDisatcher()
     const datasource = createDatasource()
-    const designer = createDesigner(config, undefined, registry)
+    const designer = createDesigner(bundle ?? { ...config, moduleType: 'app' }, undefined, registry)
     const gateway = createGateway()
 
     return new App(dispatcher, datasource, gateway, designer, config)
@@ -111,7 +116,7 @@ export class SplitflowApp {
         datasource: Datasource,
         gateway: Gateway,
         designer: SplitflowDesigner,
-        config?: AppConfig
+        config: AppConfig
     ) {
         this.dispatcher = dispatcher
         this.datasource = datasource
@@ -135,11 +140,14 @@ export class SplitflowApp {
     gateway: Gateway
     designer: SplitflowDesigner
     #config: AppConfig
-    #initialize: Promise<{ error?: Error }>
+    #initialize: Promise<{ app?: SplitflowApp; error?: Error }>
 
-    async initialize(_?: any) {
+    async initialize() {
         return (this.#initialize ??= (async () => {
-            return this.designer.initialize()
+            const { error } = await this.designer.initialize()
+
+            if (error) return { error }
+            return { app: this }
         })())
     }
 
@@ -186,8 +194,8 @@ export function createSplitflowAppKit(
     config: AppConfig,
     fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 ) {
-    const gateway = createGateway(fetch)
-    const designer = createDesignerKit(config)
+    const gateway = createGateway({}, fetch)
+    const designer = createDesignerKit({ ...config, moduleType: 'app' })
 
     return {
         gateway,
@@ -200,6 +208,19 @@ export interface SplitflowAppKit {
     gateway: Gateway
     designer: SplitflowDesignerKit
     config: AppConfig
+}
+
+export interface AppBundle extends DesignerBundle {
+    config: AppConfig
+}
+
+export function isAppBundle(bundle: AppBundle | AppConfig): bundle is AppBundle {
+    return !!(bundle as any).config
+}
+
+export async function loadSplitflowAppBundle(kit: SplitflowAppKit): Promise<AppBundle> {
+    const bundle1 = await loadSplitflowDesignerBundle(kit.designer)
+    return { config: kit.config, ...bundle1 }
 }
 
 function isSSRRegistry(value: any): value is SSRRegistry {
