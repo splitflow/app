@@ -4,10 +4,25 @@ import * as actions from './actions'
 import panel, { PanelState } from './stores/panel'
 import dialog, { DialogState } from './stores/dialog'
 import alert, { AlertState } from './stores/alert'
-import { SSRRegistry, SplitflowDesigner, createDesigner } from '@splitflow/designer'
+import {
+    DesignerBundle,
+    SSRRegistry,
+    SplitflowDesigner,
+    SplitflowDesignerKit,
+    createDesigner,
+    createDesignerKit,
+    loadSplitflowDesignerBundle
+} from '@splitflow/designer'
+import { Gateway, createGateway } from './gateway'
+import { Writable, writable } from '@splitflow/core/stores'
+
+function isWritable(object: any): object is Writable<any> {
+    if (!!object?.subscribe && !!object?.set) return true
+    return false
+}
 
 export interface AppConfig {
-    projectId?: string
+    accountId?: string
     appId?: string
     devtool?: boolean
     ssr?: boolean
@@ -18,6 +33,7 @@ export interface AppConfig {
 export interface SplitflowApp {
     dispatcher: Dispatcher
     datasource: Datasource
+    gateway: Gateway
     designer: SplitflowDesigner
 }
 
@@ -27,6 +43,7 @@ export interface SplitflowAppConstructor<T extends SplitflowApp> {
     new (
         dispatcher: Dispatcher,
         datasource: Datasource,
+        gateway: Gateway,
         designer: SplitflowDesigner,
         config: AppConfig
     ): T
@@ -47,6 +64,7 @@ export function initializeSplitflowApp(
         defaultApp = new App(
             defaultApp.dispatcher,
             defaultApp.datasource,
+            defaultApp.gateway,
             defaultApp.designer,
             config
         )
@@ -56,20 +74,26 @@ export function initializeSplitflowApp(
     return defaultApp
 }
 
-export function createSplitflowApp(config: AppConfig, registry?: SSRRegistry): SplitflowApp
+export function createSplitflowApp(
+    init: AppConfig | AppBundle,
+    registry?: SSRRegistry
+): SplitflowApp
 
 export function createSplitflowApp<T extends SplitflowApp>(
-    config: AppConfig,
+    init: AppConfig | AppBundle,
     App: SplitflowAppConstructor<T>
 ): T
 
 export function createSplitflowApp<T extends SplitflowApp>(
-    config: AppConfig,
+    init: AppConfig | AppBundle,
     registry: SSRRegistry,
     App: SplitflowAppConstructor<T>
 ): T
 
-export function createSplitflowApp(config: AppConfig, arg2?: any, arg3?: any) {
+export function createSplitflowApp(init: AppConfig | AppBundle, arg2?: any, arg3?: any) {
+    const bundle = isAppBundle(init) ? init : undefined
+    const config = isAppBundle(init) ? init.config : init
+
     const registry = isSSRRegistry(arg2) ? arg2 : undefined
     const App = isSplitflowAppConstructor(arg2)
         ? arg2
@@ -79,9 +103,10 @@ export function createSplitflowApp(config: AppConfig, arg2?: any, arg3?: any) {
 
     const dispatcher = createDisatcher()
     const datasource = createDatasource()
-    const designer = createDesigner(config, undefined, registry)
+    const designer = createDesigner(bundle ?? { ...config, moduleType: 'app' }, undefined, registry)
+    const gateway = createGateway()
 
-    return new App(dispatcher, datasource, designer, config)
+    return new App(dispatcher, datasource, gateway, designer, config)
 }
 
 export function getDefaultApp() {
@@ -92,11 +117,13 @@ export class SplitflowApp {
     constructor(
         dispatcher: Dispatcher,
         datasource: Datasource,
+        gateway: Gateway,
         designer: SplitflowDesigner,
-        config?: AppConfig
+        config: AppConfig
     ) {
         this.dispatcher = dispatcher
         this.datasource = datasource
+        this.gateway = gateway
         this.designer = designer
         this.#config = config
 
@@ -113,13 +140,17 @@ export class SplitflowApp {
 
     dispatcher: Dispatcher
     datasource: Datasource
+    gateway: Gateway
     designer: SplitflowDesigner
     #config: AppConfig
-    #initialize: Promise<{ error?: Error }>
+    #initialize: Promise<{ app?: SplitflowApp; error?: Error }>
 
     async initialize() {
         return (this.#initialize ??= (async () => {
-            return this.designer.initialize()
+            const { error } = await this.designer.initialize()
+
+            if (error) return { error }
+            return { app: this }
         })())
     }
 
@@ -130,6 +161,18 @@ export class SplitflowApp {
 
     discard(panelName: string) {
         const action: actions.PanelAction = { type: 'discard', name: panelName }
+        this.dispatcher.dispatchAction(action)
+    }
+
+    open<T>(dialogName: string, value?: T | Writable<T>, close?: (value: T) => void) {
+        value = isWritable(value) ? value : writable(value)
+        const action: actions.DialogAction = { type: 'open', name: dialogName, value, close }
+        this.dispatcher.dispatchAction(action)
+        return value
+    }
+
+    cancel(dialogName: string) {
+        const action: actions.DialogAction = { type: 'cancel', name: dialogName }
         this.dispatcher.dispatchAction(action)
     }
 
@@ -148,6 +191,39 @@ export class SplitflowApp {
     get alert() {
         return this.datasource.fetchResource<AlertState>({ name: 'alert' })
     }
+}
+
+export function createSplitflowAppKit(
+    config: AppConfig,
+    fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+) {
+    const gateway = createGateway({}, fetch)
+    const designer = createDesignerKit({ ...config, moduleType: 'app' })
+
+    return {
+        gateway,
+        designer,
+        config
+    }
+}
+
+export interface SplitflowAppKit {
+    gateway: Gateway
+    designer: SplitflowDesignerKit
+    config: AppConfig
+}
+
+export interface AppBundle extends DesignerBundle {
+    config: AppConfig
+}
+
+export function isAppBundle(bundle: AppBundle | AppConfig): bundle is AppBundle {
+    return !!(bundle as any).config
+}
+
+export async function loadSplitflowAppBundle(kit: SplitflowAppKit): Promise<AppBundle> {
+    const bundle1 = await loadSplitflowDesignerBundle(kit.designer)
+    return { config: kit.config, ...bundle1 }
 }
 
 function isSSRRegistry(value: any): value is SSRRegistry {

@@ -8,6 +8,7 @@ export interface DialogData<T> {
     value: Writable<T>
     close: (value: T) => void
     cancel: () => void
+    target?: EventTarget
 }
 
 const dialog = writable<DialogState>({})
