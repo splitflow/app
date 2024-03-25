@@ -74,15 +74,18 @@ export function initializeSplitflowApp(
     return defaultApp
 }
 
-export function createSplitflowApp(config: AppConfig, registry?: SSRRegistry): SplitflowApp
+export function createSplitflowApp(
+    init: AppConfig | AppBundle,
+    registry?: SSRRegistry
+): SplitflowApp
 
 export function createSplitflowApp<T extends SplitflowApp>(
-    config: AppConfig,
+    init: AppConfig | AppBundle,
     App: SplitflowAppConstructor<T>
 ): T
 
 export function createSplitflowApp<T extends SplitflowApp>(
-    config: AppConfig,
+    init: AppConfig | AppBundle,
     registry: SSRRegistry,
     App: SplitflowAppConstructor<T>
 ): T
